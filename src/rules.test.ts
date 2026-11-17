@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { balance, gradeJump, points, safeWindow } from './rules';
+import { balance, gradeJump, points, safeWindow, scaledGap, scaledPosition } from './rules';
 
 describe('점프 판정과 점수', () => {
   it('안전 구간과 등급 경계를 구분한다', () => {
@@ -18,16 +18,31 @@ describe('점프 판정과 점수', () => {
   });
   it('표시 구간 양 끝에서 장애물과 충돌하지 않는다', () => {
     const obstacleX = 850;
-    const window = safeWindow(obstacleX);
-    for (let x = window.start; x <= window.end; x += 0.5)
+    for (let speed = balance.minSpeed; speed <= balance.maxSpeed; speed += 5)
     {
-      for (let t = 0; t <= 0.8; t += 1 / 120)
+      const window = safeWindow(obstacleX, speed);
+      expect(window.start).toBeLessThan(window.end);
+      for (let x = window.start; x <= window.end; x += 1)
       {
-        const playerX = x + balance.speed * t;
-        const height = Math.max(0, balance.jump * t - balance.gravity * t * t / 2);
-        const overlapping = Math.abs(playerX - obstacleX) < (balance.playerSize + balance.obstacleWidth) / 2;
-        expect(overlapping && height < balance.obstacleHeight).toBe(false);
+        let height = 0;
+        let velocity = balance.jump;
+        let playerX = x;
+        for (let tick = 0; tick < 100; tick++)
+        {
+          playerX += speed / 120;
+          velocity -= balance.gravity / 120;
+          height = Math.max(0, height + velocity / 120);
+          const overlapping = Math.abs(playerX - obstacleX) < (balance.playerSize + balance.obstacleWidth) / 2;
+          expect(overlapping && height < balance.obstacleHeight).toBe(false);
+        }
       }
+    }
+  });
+  it('속도 변경 전후 장애물까지 걸리는 시간과 간격을 유지한다', () => {
+    for (const speed of [balance.minSpeed, balance.speed, balance.maxSpeed])
+    {
+      expect(scaledGap(balance.gapMin, speed) / speed).toBeCloseTo(balance.gapMin / balance.speed);
+      expect((scaledPosition(900, 200, balance.speed, speed) - 200) / speed).toBeCloseTo(700 / balance.speed);
     }
   });
 });

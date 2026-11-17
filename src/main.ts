@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { balance, gradeJump, points, safeWindow, type Grade } from './rules';
+import { balance, gradeJump, points, safeWindow, scaledGap, scaledPosition, type Grade } from './rules';
 import './style.css';
 
 const W = 960;
@@ -12,6 +12,7 @@ type Obstacle = { x: number; grade: Grade | null; checked: boolean };
 document.querySelector<HTMLDivElement>('#game')!.innerHTML = `
   <div id="canvas"></div>
   <div class="hud"><div><small>점수</small><strong id="score">0</strong></div><div><small>콤보</small><strong id="combo">0</strong></div><button id="pause" aria-label="일시정지">Ⅱ</button></div>
+  <div class="speed-control"><label for="speed">속도 <strong id="speed-value">보통 · 1.00×</strong></label><input id="speed" type="range" min="180" max="420" step="5" value="240" aria-label="달리기 속도"><div class="speed-labels"><span>느림</span><span>보통</span><span>빠름</span></div></div>
   <div id="message" class="message"></div>
   <div id="overlay" class="overlay"><div class="card"><div class="eyebrow">READY, SET, JUMP!</div><h1>Geometry <span>Run</span></h1><p>바닥의 빛이 발밑에 오면 점프!<br>꾹 누르면 착지할 때마다 다시 뛰어요.</p><button id="start" class="primary">시작하기 <span>→</span></button><small>화면 터치 · 스페이스바</small></div></div>`;
 
@@ -20,6 +21,8 @@ const scoreEl = document.querySelector<HTMLElement>('#score')!;
 const comboEl = document.querySelector<HTMLElement>('#combo')!;
 const message = document.querySelector<HTMLElement>('#message')!;
 const pauseButton = document.querySelector<HTMLButtonElement>('#pause')!;
+const speedInput = document.querySelector<HTMLInputElement>('#speed')!;
+const speedValue = document.querySelector<HTMLElement>('#speed-value')!;
 
 class RunScene extends Phaser.Scene {
   private graphics!: Phaser.GameObjects.Graphics;
@@ -36,6 +39,8 @@ class RunScene extends Phaser.Scene {
   private bestCombo = 0;
   private perfects = 0;
   private feedbackUntil = 0;
+  private speed: number = balance.speed;
+  private requestedSpeed: number = balance.speed;
 
   constructor() { super('run'); }
 
@@ -55,6 +60,14 @@ class RunScene extends Phaser.Scene {
     this.input.keyboard!.on('keyup-SPACE', () => { this.held = false; });
     document.querySelector<HTMLButtonElement>('#start')!.addEventListener('click', () => this.startRun());
     pauseButton.addEventListener('click', () => this.pauseRun());
+    speedInput.addEventListener('input', () => {
+      this.requestedSpeed = Number(speedInput.value);
+      if (!this.running)
+      {
+        this.applySpeed();
+      }
+      this.updateSpeedLabel();
+    });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden)
       {
@@ -74,7 +87,9 @@ class RunScene extends Phaser.Scene {
     this.bestCombo = 0;
     this.perfects = 0;
     this.held = false;
-    this.obstacles = [{ x: 850, grade: null, checked: false }];
+    this.speed = this.requestedSpeed;
+    this.updateSpeedLabel();
+    this.obstacles = [{ x: scaledGap(850, this.speed), grade: null, checked: false }];
     this.started = true;
     this.running = true;
     this.updateHud();
@@ -109,7 +124,7 @@ class RunScene extends Phaser.Scene {
     const next = this.obstacles.find(item => !item.checked && item.x > this.x);
     if (next)
     {
-      next.grade = gradeJump(this.x, next.x);
+      next.grade = gradeJump(this.x, next.x, this.speed);
     }
   }
 
@@ -131,7 +146,7 @@ class RunScene extends Phaser.Scene {
   }
 
   private simulate(): void {
-    this.x += balance.speed * step;
+    this.x += this.speed * step;
     if (this.height > 0 || this.velocity > 0)
     {
       this.velocity -= balance.gravity * step;
@@ -140,10 +155,6 @@ class RunScene extends Phaser.Scene {
       {
         this.height = 0;
         this.velocity = 0;
-        if (this.held)
-        {
-          this.tryJump();
-        }
       }
     }
     for (const item of this.obstacles)
@@ -177,13 +188,55 @@ class RunScene extends Phaser.Scene {
         this.updateHud();
       }
     }
+    if (this.height === 0 && this.velocity === 0)
+    {
+      this.applySpeed();
+      if (this.held)
+      {
+        this.tryJump();
+      }
+    }
     this.obstacles = this.obstacles.filter(item => item.x > this.x - 100);
     const last = this.obstacles[this.obstacles.length - 1];
     if (last.x < this.x + W + balance.gapMax)
     {
-      const gap = Phaser.Math.Between(balance.gapMin, balance.gapMax);
+      const gap = scaledGap(Phaser.Math.Between(balance.gapMin, balance.gapMax), this.speed);
       this.obstacles.push({ x: last.x + gap, grade: null, checked: false });
     }
+  }
+
+  private applySpeed(): void {
+    if (this.speed === this.requestedSpeed)
+    {
+      // 같은 속도 요청은 장애물 배치를 바꾸지 않는다.
+      return;
+    }
+    if (this.running || this.started)
+    {
+      const next = this.obstacles.find(item => !item.checked && item.x > this.x);
+      const nextPosition = next && scaledPosition(next.x, this.x, this.speed, this.requestedSpeed);
+      if (this.height > 0 || this.velocity > 0 || (nextPosition !== undefined && this.x > safeWindow(nextPosition, this.requestedSpeed).start))
+      {
+        // 진행 중인 점프나 가까운 장애물은 기존 속도로 통과한다.
+        return;
+      }
+    }
+    for (const item of this.obstacles)
+    {
+      if (!item.checked && item.x > this.x)
+      {
+        item.x = scaledPosition(item.x, this.x, this.speed, this.requestedSpeed);
+        item.grade = null;
+      }
+    }
+    this.speed = this.requestedSpeed;
+    this.updateSpeedLabel();
+  }
+
+  private updateSpeedLabel(): void {
+    const label = this.requestedSpeed < 220 ? '느림' : this.requestedSpeed < 310 ? '보통' : '빠름';
+    const pending = this.speed !== this.requestedSpeed ? ' · 적용 대기' : '';
+    speedValue.textContent = `${label} · ${(this.requestedSpeed / balance.speed).toFixed(2)}×${pending}`;
   }
 
   private updateHud(): void {
@@ -231,7 +284,7 @@ class RunScene extends Phaser.Scene {
     for (const item of this.obstacles)
     {
       const px = item.x - this.x + playerScreenX;
-      const window = safeWindow(item.x);
+      const window = safeWindow(item.x, this.speed);
       const start = window.start - this.x + playerScreenX;
       const end = window.end - this.x + playerScreenX;
       g.fillStyle(0x81e6d1, 0.24).fillRoundedRect(start, ground - 8, end - start, 7, 3);
