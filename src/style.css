@@ -1,0 +1,26 @@
+:root { font-family: 'Arial Rounded MT Bold', 'Malgun Gothic', sans-serif; color: #f4fbfc; background: #101e30; font-synthesis: none; }
+* { box-sizing: border-box; }
+html, body, #game { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+body { touch-action: none; }
+#game { position: relative; display: grid; place-items: center; }
+#canvas { width: 100%; height: 100%; }
+canvas { display: block; }
+.hud { position: absolute; top: max(18px, env(safe-area-inset-top)); left: max(24px, env(safe-area-inset-left)); right: max(24px, env(safe-area-inset-right)); display: flex; gap: 34px; align-items: flex-start; pointer-events: none; }
+.hud div { display: grid; gap: 2px; min-width: 60px; }
+.hud small { font-size: 11px; color: #a8c4ce; font-weight: bold; }
+.hud strong { font-size: 24px; }
+button { font: inherit; cursor: pointer; border: 0; }
+#pause { pointer-events: auto; margin-left: auto; background: #ffffff20; color: white; width: 46px; height: 46px; border-radius: 14px; font-size: 18px; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: #101d30a8; padding: 20px; }
+.hidden { display: none; }
+.card { width: min(470px, 92vw); padding: 36px 40px; border: 1px solid #a8e7df55; border-radius: 25px; background: #1b344aee; box-shadow: 0 24px 75px #06111d77; text-align: center; }
+.eyebrow { color: #7de0cd; font-size: 11px; letter-spacing: .22em; font-weight: bold; }
+h1 { margin: 12px 0; font-size: clamp(30px, 6vw, 46px); letter-spacing: -.04em; }
+h1 span { color: #ffd879; }
+p { color: #c5d9df; font-size: 15px; line-height: 1.8; margin: 0 0 22px; }
+.primary { display: block; width: 100%; min-height: 54px; padding: 13px 20px; border-radius: 14px; background: #ffda78; color: #273d4c; font-weight: 800; font-size: 17px; }
+.primary span { float: right; }
+.card small { display: block; color: #8baab7; font-size: 12px; margin-top: 15px; }
+.message { position: absolute; top: 25%; left: 0; right: 0; text-align: center; font-weight: 900; font-size: clamp(21px, 4vw, 38px); color: #a8f1df; pointer-events: none; text-shadow: 0 3px 12px #112b3a; }
+.message.perfect { color: #ffe088; }
+@media (max-height: 430px) { .card { padding: 20px 32px; } h1 { margin: 6px 0; font-size: 30px; } p { margin-bottom: 12px; font-size: 13px; } .card small { margin-top: 8px; } }
